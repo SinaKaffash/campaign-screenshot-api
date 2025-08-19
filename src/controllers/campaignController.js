@@ -1,0 +1,112 @@
+// const CampaignModel = require('../models/campaignModel');
+import CampaignModel from "../models/campaignModel.js";
+
+class CampaignController {
+    static async createCampaign(req, res, next) {
+        try {
+            const { camp_num, camp_text, selected_channels } = req.body;
+            const userId = req.user.id;
+
+            // Create campaign
+            const campaignId = await CampaignModel.createCampaign({
+                camp_num,
+                camp_text,
+                user_id: userId,
+            });
+
+            // Create campaign channels
+            await CampaignModel.createCampaignChannels(campaignId, selected_channels);
+
+            // Fetch the created campaign with channels
+            const campaign = await CampaignModel.getCampaignById(campaignId, userId);
+
+            res.status(201).json({
+                status: "success",
+                message: "Campaign created successfully",
+                data: {
+                    campaign,
+                },
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    static async getCampaigns(req, res, next) {
+        try {
+            const userId = req.user.id;
+            const limit = parseInt(req.query.limit) || 10;
+            const page = parseInt(req.query.page) || 1;
+            const offset = (page - 1) * limit;
+
+            const campaigns = await CampaignModel.getCampaignsByUserId(userId, limit, offset);
+
+            res.status(200).json({
+                status: "success",
+                message: "Campaigns retrieved successfully",
+                data: {
+                    campaigns,
+                    pagination: {
+                        page,
+                        limit,
+                        total: campaigns.length,
+                    },
+                },
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    static async getCampaignById(req, res, next) {
+        try {
+            const { id } = req.params;
+            const userId = req.user.id;
+
+            const campaign = await CampaignModel.getCampaignById(id, userId);
+
+            if (!campaign) {
+                return res.status(404).json({
+                    status: "error",
+                    message: "Campaign not found",
+                });
+            }
+
+            res.status(200).json({
+                status: "success",
+                message: "Campaign retrieved successfully",
+                data: {
+                    campaign,
+                },
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    static async deleteCampaign(req, res, next) {
+        try {
+            const { id } = req.params;
+            const userId = req.user.id;
+
+            const deleted = await CampaignModel.deleteCampaign(id, userId);
+
+            if (!deleted) {
+                return res.status(404).json({
+                    status: "error",
+                    message: "Campaign not found",
+                });
+            }
+
+            res.status(200).json({
+                status: "success",
+                message: "Campaign deleted successfully",
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+}
+
+// module.exports = CampaignController;
+export default CampaignController;
