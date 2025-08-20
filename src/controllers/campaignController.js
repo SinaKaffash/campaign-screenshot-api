@@ -1,5 +1,6 @@
 // const CampaignModel = require('../models/campaignModel');
 import CampaignModel from "../models/campaignModel.js";
+import { sendCampaignToExternalService, mapLinksToChannels } from "../services/campaignService.js";
 
 class CampaignController {
     static async createCampaign(req, res, next) {
@@ -19,6 +20,25 @@ class CampaignController {
 
             // Fetch the created campaign with channels
             const campaign = await CampaignModel.getCampaignById(campaignId, userId);
+
+            // ⬇️ Send campaign data to external service
+            const apiResponse = await sendCampaignToExternalService({
+                // id: campaignId,
+                // camp_num,
+                text: camp_text,
+                // user_id: userId,
+                // channels: selected_channels,
+                // createdAt: campaign.createdAt,
+            });
+
+            const channelLinks = mapLinksToChannels(apiResponse, selected_channels);
+
+            console.log("Channel Links:", channelLinks);
+
+            // 6. Update channel rows with post_link
+            if (channelLinks.length > 0) {
+                await CampaignModel.updateChannelPostLinks(campaignId, channelLinks);
+            }
 
             res.status(201).json({
                 status: "success",

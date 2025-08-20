@@ -31,6 +31,30 @@ class CampaignModel {
         );
     }
 
+    static async updateChannelPostLinks(campaignId, channelLinks) {
+        const connection = getConnection();
+        if (!channelLinks || channelLinks.length === 0) return;
+
+        const cases = [];
+        const values = [];
+        const conditions = [];
+
+        channelLinks.forEach(({ channel_name, post_link }) => {
+            cases.push(`WHEN channel_name = ? AND campaign_id = ? THEN ?`);
+            values.push(channel_name, campaignId, post_link);
+            conditions.push(`(channel_name = ? AND campaign_id = ?)`);
+            values.push(channel_name, campaignId);
+        });
+
+        const sql = `
+        UPDATE campaign_channels
+        SET post_link = CASE ${cases.join(" ")} END
+        WHERE ${conditions.join(" OR ")}
+    `;
+
+        await connection.execute(sql, values);
+    }
+
     static async getCampaignById(campaignId, userId) {
         const connection = getConnection();
 
