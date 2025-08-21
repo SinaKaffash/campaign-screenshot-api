@@ -15,19 +15,28 @@ class CampaignModel {
         return result.insertId;
     }
 
-    static async createCampaignChannels(campaignId, channels) {
+    static async createCampaignChannels(campaignId, channels, camp_num) {
         const connection = getConnection();
 
         if (!channels || channels.length === 0) return;
 
-        const values = channels.map((channel) => [campaignId, channel, new Date()]);
-        const placeholders = values.map(() => "(?, ?, ?)").join(", ");
+        const values = channels.map((channel) => [campaignId, channel, camp_num, new Date()]);
+        const placeholders = values.map(() => "(?, ?, ?, ?)").join(", ");
         const flatValues = values.flat();
 
         await connection.execute(
-            `INSERT INTO campaign_channels (campaign_id, channel_name, created_at) 
+            `INSERT INTO campaign_channels (campaign_id, channel_name, camp_num, created_at) 
        VALUES ${placeholders}`,
             flatValues
+        );
+    }
+
+    static updateCampaignStatus(campaignId, status) {
+        const connection = getConnection();
+
+        return connection.execute(
+            "UPDATE campaigns SET status = ?, updated_at = NOW() WHERE id = ?",
+            [status, campaignId]
         );
     }
 
@@ -48,7 +57,8 @@ class CampaignModel {
 
         const sql = `
         UPDATE campaign_channels
-        SET post_link = CASE ${cases.join(" ")} END
+        SET post_link = CASE ${cases.join(" ")} END,
+            status = 'processing'
         WHERE ${conditions.join(" OR ")}
     `;
 
@@ -62,8 +72,8 @@ class CampaignModel {
             `SELECT c.*, 
               GROUP_CONCAT(cc.channel_name) as channels
        FROM campaigns c
-       LEFT JOIN campaign_channels cc ON c.id = cc.campaign_id
-       WHERE c.id = ? AND c.user_id = ?
+       LEFT JOIN campaign_channels cc ON c.id = cc.campaign_id 
+       WHERE c.id = ? AND c.user_id = ? AND c.camp_num = cc.camp_num 
        GROUP BY c.id`,
             [campaignId, userId]
         );
@@ -125,6 +135,8 @@ class CampaignModel {
             throw error;
         }
     }
+
+    static async getPostlinks() {}
 }
 
 // module.exports = CampaignModel;

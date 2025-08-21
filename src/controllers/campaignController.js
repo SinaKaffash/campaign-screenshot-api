@@ -1,6 +1,7 @@
 // const CampaignModel = require('../models/campaignModel');
 import CampaignModel from "../models/campaignModel.js";
 import { sendCampaignToExternalService, mapLinksToChannels } from "../services/campaignService.js";
+import { takeScreenshot } from "../services/screenshotService.js"; // Import screenshot service
 
 class CampaignController {
     static async createCampaign(req, res, next) {
@@ -16,10 +17,12 @@ class CampaignController {
             });
 
             // Create campaign channels
-            await CampaignModel.createCampaignChannels(campaignId, selected_channels);
+            await CampaignModel.createCampaignChannels(campaignId, selected_channels, camp_num);
 
             // Fetch the created campaign with channels
             const campaign = await CampaignModel.getCampaignById(campaignId, userId);
+
+            console.log("Created Campaign:", campaign);
 
             // ⬇️ Send campaign data to external service
             const apiResponse = await sendCampaignToExternalService({
@@ -33,18 +36,35 @@ class CampaignController {
 
             const channelLinks = mapLinksToChannels(apiResponse, selected_channels);
 
-            console.log("Channel Links:", channelLinks);
-
             // 6. Update channel rows with post_link
             if (channelLinks.length > 0) {
                 await CampaignModel.updateChannelPostLinks(campaignId, channelLinks);
             }
 
+            // 7. Send postlinks to take screenshots as array and send as response
+            const postlinksArr = channelLinks.map((link) => link.post_link);
+
+            const screenshotData = {
+                given_url: postlinksArr,
+            };
+
+            const screenshotResponse = await takeScreenshot(screenshotData);
+
+            console.log("Screenshot Response:", screenshotResponse);
+
+            if (screenshotResponse.success) {
+                // Update the campaign status to "processing"
+                await CampaignModel.updateCampaignStatus(campaignId, "processing-to-screenshot");
+            }
+
+            // 10. Return the response
             res.status(201).json({
                 status: "success",
                 message: "Campaign created successfully",
                 data: {
                     campaign,
+                    screenshot: screenshotResponse,
+                    message: "urls are being processed, please wait",
                 },
             });
         } catch (error) {
