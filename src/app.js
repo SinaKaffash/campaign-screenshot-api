@@ -9,7 +9,10 @@ import authRoutes from "./routes/authRoutes.js";
 import errorHandler from "./middleware/errorHandler.js";
 
 dotenv.config();
+
+// Set the trust proxy setting in your Express app
 const app = express();
+app.set("trust proxy", 1);
 
 // Security middleware
 app.use(helmet());

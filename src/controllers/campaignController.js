@@ -36,11 +36,6 @@ class CampaignController {
 
             const channelLinks = mapLinksToChannels(apiResponse, selected_channels);
 
-            // 6. Update channel rows with post_link
-            if (channelLinks.length > 0) {
-                await CampaignModel.updateChannelPostLinks(campaignId, channelLinks);
-            }
-
             // 7. Send postlinks to take screenshots as array and send as response
             const postlinksArr = channelLinks.map((link) => link.post_link);
 
@@ -55,8 +50,11 @@ class CampaignController {
             if (screenshotResponse.success) {
                 // Update the campaign status to "processing"
                 await CampaignModel.updateCampaignStatus(campaignId, "processing-to-screenshot");
-            }
 
+                if (channelLinks.length > 0) {
+                    await CampaignModel.updateChannelPostLinks(campaignId, channelLinks);
+                }
+            }
             // 10. Return the response
             res.status(201).json({
                 status: "success",

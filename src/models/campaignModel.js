@@ -39,30 +39,56 @@ class CampaignModel {
             [status, campaignId]
         );
     }
-
-    static async updateChannelPostLinks(campaignId, channelLinks) {
+    static async updateChannelPostLinks(
+        campaignId,
+        channelLinks,
+        status = "processing-to-screenshot"
+    ) {
         const connection = getConnection();
         if (!channelLinks || channelLinks.length === 0) return;
 
         const cases = [];
-        const values = [];
-        const conditions = [];
+        const caseValues = [];
+        const whereConditions = [];
+        const whereValues = [];
 
         channelLinks.forEach(({ channel_name, post_link }) => {
-            cases.push(`WHEN channel_name = ? AND campaign_id = ? THEN ?`);
-            values.push(channel_name, campaignId, post_link);
-            conditions.push(`(channel_name = ? AND campaign_id = ?)`);
-            values.push(channel_name, campaignId);
+            cases.push(`WHEN channel_name = ? THEN ?`);
+            caseValues.push(channel_name, post_link);
+
+            whereConditions.push(`channel_name = ?`);
+            whereValues.push(channel_name);
         });
 
         const sql = `
         UPDATE campaign_channels
         SET post_link = CASE ${cases.join(" ")} END,
-            status = 'processing'
-        WHERE ${conditions.join(" OR ")}
+            status = ?
+        WHERE campaign_id = ? AND status = "finding-postlink"
+        AND (${whereConditions.join(" OR ")})
     `;
 
-        await connection.execute(sql, values);
+        await connection.execute(sql, [...caseValues, status, campaignId, ...whereValues]);
+    }
+    /*  
+    example usage:
+
+    await CampaignModel.updateChannelStatus(
+        [failedChannel.channel_name],
+        "screenshot_failed"
+    );
+
+    */
+
+    static async updateChannelStatus(channelNames, status) {
+        const connection = getConnection();
+        if (!channelNames || channelNames.length === 0) return;
+
+        const placeholders = channelNames.map(() => "?").join(", ");
+        await connection.execute(
+            `UPDATE campaign_channels SET status = ?, updated_at = NOW() WHERE channel_name IN (${placeholders})`,
+            [status, ...channelNames]
+        );
     }
 
     static async getCampaignById(campaignId, userId) {
@@ -73,7 +99,7 @@ class CampaignModel {
               GROUP_CONCAT(cc.channel_name) as channels
        FROM campaigns c
        LEFT JOIN campaign_channels cc ON c.id = cc.campaign_id 
-       WHERE c.id = ? AND c.user_id = ? AND c.camp_num = cc.camp_num 
+       WHERE c.id = ? AND c.user_id = ? AND c.camp_num = cc.camp_num AND c.status = 'finding-postlinks' AND cc.status = 'finding-postlink'
        GROUP BY c.id`,
             [campaignId, userId]
         );
